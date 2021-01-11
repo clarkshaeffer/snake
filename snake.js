@@ -7,7 +7,7 @@ const OFFSET_Y = snakeHeight / 2;
 const GRID_X = SCREENWIDTH / snakeWidth; // grid value lines for sprite
 const GRID_Y = SCREENHEIGHT / snakeHeight;
 const movespeed = 16; // pixels moved per frame
-const gamespeed = 100; // milliseconds between frames
+const gamespeed = 100; // milliseconds between frames of player movement
 let keySpace, keyLeft, keyRight, keyUp, keyDown;
 let movement = 'right';
 let gameTimer;
@@ -18,17 +18,16 @@ let points = 0;
 
 function SnakeBody() {
     this.head = null;
-    this.size = 1;
+    this.tail = null;
 }
 function BodyCell(x, y) {
     this.x = x;
     this.y = y;
     this.next = null;
+    this.prev = null;
 }
 
-let snake = new SnakeBody();
-snake.head = new BodyCell(OFFSET_X, OFFSET_Y);
-
+let snake;
 
 
 
@@ -49,6 +48,19 @@ class Snake extends Phaser.Scene {
         });
     }
     create() {
+        snake = new SnakeBody();
+        snake.head = new BodyCell(OFFSET_X, OFFSET_Y);
+        snake.tail = new BodyCell(OFFSET_X - snakeWidth, OFFSET_Y);
+        snake.head.next = snake.tail;
+        snake.tail.prev = snake.head;
+        // snake.tail = snake.head;
+        console.log('head:');
+        console.log(snake.head);
+        console.log('tail:');
+        console.log(snake.tail);
+        let len = this.GetSnakeLength(snake);
+
+
         this.cameras.main.setBackgroundColor(0x333333);
 
         cell = this.add.sprite(OFFSET_X, OFFSET_Y, 'cell'); // top left
@@ -62,26 +74,41 @@ class Snake extends Phaser.Scene {
         keyRight = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
         keyUp = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
         keyDown = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
-        // console.log(cell.x)
 
         gameTimer = this.time.addEvent({ delay: gamespeed, callback: this.move, callbackScope: this, repeat: -1 });
 
     } // end create()
 
     update() {
-        snake.head.x = cell.x;
-        snake.head.y = cell.y;
+        /*
+        Constant (not every frame): move(), called with the gameTimer in the create function.
+        Every frame: 
+                OutOfBoundsCheck(): check out of bounds
+                MovementCheck(): check keyboard input to change movement direction
+        */
+
+        // snake.head.x = cell.x;
+        // snake.head.y = cell.y;
         // console.log(snake.head.x === cell.x && snake.head.y === cell.y);
 
+        this.OutOfBoundsCheck();
+        this.MovementCheck();
 
+        if (cell.x === red.x && cell.y === red.y) {
+            this.Collect();
+        }
+
+    } // end update()
+
+    OutOfBoundsCheck() {
         if (cell.x > 800 || cell.x < 0 || cell.y > 600 || cell.y < 0) {
             cell.x = OFFSET_X;
             cell.y = OFFSET_Y;
             movement = 'right';
         }
-        // console.log((cell.y + 8) % 16 === 0);
-        // console.log(SCREENWIDTH % (cell.x + 8) === 0);
+    }
 
+    MovementCheck() {
         if (keyRight.isDown && movement != 'left' && (cell.y + 8) % 16 === 0) {
             movement = 'right';
         }
@@ -94,32 +121,33 @@ class Snake extends Phaser.Scene {
         else if (keyDown.isDown && movement != 'up' && (cell.x + 8) % 16 === 0) {
             movement = 'down';
         }
+    }
 
-        if (cell.x === red.x && cell.y === red.y) {
-            this.Collect();
-        }
-
-        // if (keySpace.isDown) {
-        //     gameTimer.paused = !gameTimer.paused;
-        //     console.log('paused: ' + gameTimer.paused);
+    move() {
+        // let temp = snake.tail; // start at tail
+        // while (temp.prev != null) { // go to head (while going to head)
+        //     temp.x = temp.prev.x; // position is that of its previous cell
+        //     temp.y = temp.prev.y;
+        //     temp = temp.prev;
+        //     console.log('hi');
         // }
 
 
-
-    } // end update()
-
-    move() {
         if (movement === 'right') {
             cell.x += movespeed;
+            snake.head.x += movespeed;
         }
         else if (movement === 'up') {
             cell.y -= movespeed;
+            snake.head.y -= movespeed;
         }
         if (movement === 'left') {
             cell.x -= movespeed;
+            snake.head.x -= movespeed;
         }
         else if (movement === 'down') {
             cell.y += movespeed;
+            snake.head.y += movespeed;
         }
     }
 
@@ -145,28 +173,59 @@ class Snake extends Phaser.Scene {
     Collect() {
         points++;
         this.SetRandomPos(red);
-        let temp = snake.head; // temp at head
-        while (temp.next != null) { // go to tail
-            temp = temp.next;
-        }
-        switch (movement) {
-            case 'right':
-                temp.x = temp.x - snakeWidth;
-                break;
-            case 'up':
-                temp.y = temp.y + snakeHeight;
-                break;
-            case 'left':
-                temp.x = temp.x + snakeWidth;
-                break;
-            case 'down':
-                temp.y = temp.y - snakeHeight;
-                break;
-        }
-        this.add.sprite(temp.x, temp.y, 'cell');
 
+
+        // let temp = snake.head; // temp at head
+        // while (temp.next != null) { // go to tail
+        //     temp = temp.next;
+        // }
+        // temp.prev = temp;
+        // temp = temp.next; // go to null behind tail
+
+        // make new tail:
+        // start at tail. it's the tail's next, and the tail is its previous. then it becomes the tail.
+        //
+        let temp = snake.tail;
+        snake.tail.next = temp;
+        temp.prev = snake.tail;
+        snake.tail = temp;
+        console.log(temp);
+        console.log(snake.tail);
+        /*
+        BodyCell {x: 1016, y: 344, next: BodyCell, prev: BodyCell}
+        BodyCell {x: 1016, y: 344, next: BodyCell, prev: BodyCell}
+
+        */
+
+
+        // switch (movement) {
+        //     case 'right':
+        //         temp.x = temp.x - snakeWidth;
+        //         break;
+        //     case 'up':
+        //         temp.y = temp.y + snakeHeight;
+        //         break;
+        //     case 'left':
+        //         temp.x = temp.x + snakeWidth;
+        //         break;
+        //     case 'down':
+        //         temp.y = temp.y - snakeHeight;
+        //         break;
+        // }
+
+        // this.add.sprite(temp.x, temp.y, 'cell'); // create new sprite at tail
     }
 
+    GetSnakeLength(sn) {
+        let len = 0;
+        let temp = sn.head;
+        while (temp.next != null) {
+            temp = temp.next;
+            len++;
+        }
+
+        return len;
+    }
 } // end Snake scene class
 
 
